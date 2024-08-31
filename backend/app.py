@@ -60,6 +60,50 @@ def login():
     
     return jsonify({"msg": "Invalid username or password"}), 401
 
+@app.route('/user', methods=['GET'])
+@jwt_required()
+def get_user():
+    current_user = get_jwt_identity()
+    user = User.query.filter_by(username=current_user).first()
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+    
+    return jsonify({
+        "id": user.id,
+        "username": user.username,
+        "name": user.name,
+        "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
+        "gender": user.gender
+    }), 200
+
+@app.route('/user', methods=['PUT'])
+@jwt_required()
+def update_user():
+    current_user = get_jwt_identity()
+    user = User.query.filter_by(username=current_user).first()
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+    
+    data = request.json
+    user.name = data.get('name', user.name)
+    user.date_of_birth = datetime.strptime(data.get('date_of_birth'), '%Y-%m-%d').date() if data.get('date_of_birth') else user.date_of_birth
+    user.gender = data.get('gender', user.gender)
+    
+    db.session.commit()
+    return jsonify({"msg": "User information updated successfully"}), 200
+
+@app.route('/user', methods=['DELETE'])
+@jwt_required()
+def delete_user():
+    current_user = get_jwt_identity()
+    user = User.query.filter_by(username=current_user).first()
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+    
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"msg": "User deleted successfully"}), 200
+
 @app.route('/onboarding', methods=['POST'])
 @jwt_required()
 def onboarding():
