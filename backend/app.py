@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for
+from flask_dance.contrib.google import make_google_blueprint, google
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -6,7 +7,21 @@ from werkzeug.utils import secure_filename
 import os
 from datetime import timedelta
 
+#When running this code locally set the below variables to 1 and in production remove the below environment variables
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
 app = Flask(__name__)
+
+#Oauth
+app.secret_key = "supersekrit"
+blueprint = make_google_blueprint(
+    client_id="my-client-id",
+    client_secret="my-secret-id",
+    scope=["profile", "email"]
+)
+app.register_blueprint(blueprint, url_prefix="/login")
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'users.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -39,6 +54,15 @@ class Document(db.Model):
 
 with app.app_context():
     db.create_all()
+
+#Oauth route
+@app.route("/")
+def index():
+    if not google.authorized:
+        return redirect(url_for("google.login"))
+    resp = google.get("/plus/v1/people/me")
+    assert resp.ok, resp.text
+    return "You are {email} on Google".format(email=resp.json()["emails"][0]["value"])
 
 @app.route('/signup', methods=['POST'])
 def signup():
